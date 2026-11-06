@@ -1,0 +1,22 @@
+# OPTIONAL. Only if the operator must use the public name before the first
+# owner exists. Prefer keeping the vhost unconfigured and using
+# http://127.0.0.1:4007 over SSH until BOOTSTRAP_REGISTRATION is false again.
+#
+# This is NOT an account. It is HTTP basic auth in front of an empty instance
+# so a stranger cannot hit /auth and become SUPERADMIN. Generate HASH on the
+# host; do not commit it. Remove this site block after the owner exists.
+
+# caddy hash-password
+# HASH='$2a$14$REPLACE_ME'
+
+postiz.evotechly.com {
+	basicauth {
+		bootstrap HASH
+	}
+	encode gzip
+	reverse_proxy 127.0.0.1:4007 {
+		flush_interval -1
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}

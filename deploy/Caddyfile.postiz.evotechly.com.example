@@ -1,0 +1,19 @@
+# Host reverse proxy snippet for the SAME Caddy that already serves
+# plane.evotechly.com on 13.140.219.161. Do not apply on 13.140.219.162.
+# Caddy handles WebSocket upgrades. Body size is unlimited by default.
+#
+# postiz container is bound to loopback only: 127.0.0.1:4007
+
+postiz.evotechly.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4007 {
+		flush_interval -1
+		transport http {
+			read_timeout 3600s
+			write_timeout 3600s
+		}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+}

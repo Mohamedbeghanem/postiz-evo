@@ -20,11 +20,18 @@ export class AuthService {
     private _providerManager: AuthProviderManager
   ) {}
   async canRegister(provider: string) {
-    if (
-      process.env.DISABLE_REGISTRATION !== 'true' ||
-      provider === Provider.GENERIC
-    ) {
+    if (provider === Provider.GENERIC) {
       return true;
+    }
+    if (process.env.DISABLE_REGISTRATION !== 'true') {
+      return true;
+    }
+    // Explicit lock: first-org SUPERADMIN signup stays closed until an
+    // operator sets BOOTSTRAP_REGISTRATION=true on a loopback-only (or
+    // proxy-auth) process. Unset keeps the legacy "first org may register"
+    // behavior for existing self-hosters.
+    if (process.env.BOOTSTRAP_REGISTRATION === 'false') {
+      return false;
     }
 
     return (await this._organizationService.getCount()) === 0;

@@ -1,0 +1,164 @@
+# postiz.evotechly.com on Contabo VPS 13.140.219.161 (shared with plane-evo).
+# Builds THIS fork. Never pull ghcr.io/gitroomhq/postiz-app.
+#
+# Forbidden: 13.140.219.162 (EvoCRM). Forbidden: stock ../docker-compose.yaml.
+# Published ports bind 127.0.0.1 only so Plane keeps 80/443.
+#
+# From repo root:
+#   export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
+#   docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml up -d --build
+#
+# POSTIZ_GIT_SHA must be the tree you are building (includes nginx/Dockerfile
+# cookie and bootstrap fixes). Do not tag an upstream gitroomhq SHA.
+
+name: postiz-evo
+
+services:
+  postiz:
+    image: postiz-evo:${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: Dockerfile.dev
+      args:
+        NEXT_PUBLIC_VERSION: postiz-evo-${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
+        POSTIZ_GIT_SHA: ${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
+    container_name: postiz-evo
+    restart: unless-stopped
+    env_file:
+      - postiz.env
+    environment:
+      MAIN_URL: ${POSTIZ_PUBLIC_URL}
+      FRONTEND_URL: ${POSTIZ_PUBLIC_URL}
+      NEXT_PUBLIC_BACKEND_URL: ${POSTIZ_PUBLIC_URL}/api
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      DATABASE_URL: postgresql://${POSTIZ_DB_USER}:${POSTIZ_DB_PASSWORD}@postiz-evo-postgres:5432/${POSTIZ_DB_NAME}
+      REDIS_URL: redis://postiz-evo-redis:6379
+      TEMPORAL_ADDRESS: postiz-evo-temporal:7233
+      TEMPORAL_NAMESPACE: default
+      IS_GENERAL: ${IS_GENERAL:-true}
+      DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-true}
+      BOOTSTRAP_REGISTRATION: ${BOOTSTRAP_REGISTRATION:-false}
+      COOKIE_HOST_ONLY: ${COOKIE_HOST_ONLY:-true}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-/uploads}
+      NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY: ${NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY:-/uploads}
+      JWT_SECRET: ${JWT_SECRET}
+    labels:
+      org.opencontainers.image.source: https://github.com/Mohamedbeghanem/postiz-evo
+      org.opencontainers.image.revision: ${POSTIZ_GIT_SHA}
+      evotechly.stack: postiz-evo
+      evotechly.public_url: https://postiz.evotechly.com
+    volumes:
+      - postiz-evo-config:/config
+      - postiz-evo-uploads:/uploads
+    ports:
+      - "127.0.0.1:${POSTIZ_LOOPBACK_PORT:-4007}:5000"
+    networks:
+      - postiz-evo-net
+    depends_on:
+      postiz-evo-postgres:
+        condition: service_healthy
+      postiz-evo-redis:
+        condition: service_healthy
+      postiz-evo-temporal:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fsS",
+          "http://127.0.0.1:5000/api/",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 300s
+
+  postiz-evo-postgres:
+    image: postgres:17-alpine
+    container_name: postiz-evo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTIZ_DB_USER}
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD}
+      POSTGRES_DB: ${POSTIZ_DB_NAME}
+    volumes:
+      - postiz-evo-postgres:/var/lib/postgresql/data
+    networks:
+      - postiz-evo-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTIZ_DB_USER} -d ${POSTIZ_DB_NAME}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    # Not published. Plane and Postiz must not share host 5432.
+
+  postiz-evo-redis:
+    image: redis:7.2
+    container_name: postiz-evo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - postiz-evo-redis:/data
+    networks:
+      - postiz-evo-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    # Not published. Do not bind host 6379.
+
+  postiz-evo-temporal-db:
+    image: postgres:16
+    container_name: postiz-evo-temporal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD}
+    volumes:
+      - postiz-evo-temporal-db:/var/lib/postgresql/data
+    networks:
+      - postiz-evo-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  postiz-evo-temporal:
+    image: temporalio/auto-setup:1.28.1
+    container_name: postiz-evo-temporal
+    restart: unless-stopped
+    depends_on:
+      postiz-evo-temporal-db:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD}
+      POSTGRES_SEEDS: postiz-evo-temporal-db
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/production.yaml
+      TEMPORAL_NAMESPACE: default
+    volumes:
+      - ./temporal-dynamicconfig.yaml:/etc/temporal/config/dynamicconfig/production.yaml:ro
+    networks:
+      - postiz-evo-net
+    # gRPC 7233 stays on the compose network. Do not publish it.
+    # Elasticsearch, Temporal UI, admin-tools, and Spotlight are omitted
+    # so this stack can sit beside plane-evo without grabbing 8080/8969.
+
+volumes:
+  postiz-evo-postgres:
+  postiz-evo-redis:
+  postiz-evo-temporal-db:
+  postiz-evo-config:
+  postiz-evo-uploads:
+
+networks:
+  postiz-evo-net:
+    name: postiz-evo-net
+    driver: bridge

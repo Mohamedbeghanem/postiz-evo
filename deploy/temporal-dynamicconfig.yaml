@@ -1,0 +1,5 @@
+# Production Temporal dynamic config for postiz-evo.
+# Do not enable development-only search-attribute cache refresh.
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
