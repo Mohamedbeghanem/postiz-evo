@@ -5,19 +5,23 @@
 # Published ports bind 127.0.0.1 only so Plane keeps 80/443.
 #
 # From repo root:
+#   export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
 #   docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml up -d --build
+#
+# POSTIZ_GIT_SHA must be the tree you are building (includes nginx/Dockerfile
+# cookie and bootstrap fixes). Do not tag an upstream gitroomhq SHA.
 
 name: postiz-evo
 
 services:
   postiz:
-    image: postiz-evo:5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+    image: postiz-evo:${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
     pull_policy: build
     build:
       context: ..
       dockerfile: Dockerfile.dev
       args:
-        NEXT_PUBLIC_VERSION: postiz-evo-5a131eb0
+        NEXT_PUBLIC_VERSION: postiz-evo-${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
     container_name: postiz-evo
     restart: unless-stopped
     env_file:
@@ -33,13 +37,15 @@ services:
       TEMPORAL_NAMESPACE: default
       IS_GENERAL: ${IS_GENERAL:-true}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-true}
+      BOOTSTRAP_REGISTRATION: ${BOOTSTRAP_REGISTRATION:-false}
+      COOKIE_HOST_ONLY: ${COOKIE_HOST_ONLY:-true}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
       UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-/uploads}
       NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY: ${NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY:-/uploads}
       JWT_SECRET: ${JWT_SECRET}
     labels:
       org.opencontainers.image.source: https://github.com/Mohamedbeghanem/postiz-evo
-      org.opencontainers.image.revision: 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+      org.opencontainers.image.revision: ${POSTIZ_GIT_SHA}
       evotechly.stack: postiz-evo
       evotechly.public_url: https://postiz.evotechly.com
     volumes:

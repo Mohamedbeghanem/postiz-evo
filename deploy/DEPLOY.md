@@ -13,19 +13,19 @@ It is **not** a live-fit certificate. Server inventory (catalog ~8GB) was not ve
 | Bind Postiz HTTP to **127.0.0.1:4007** | Publish 4007/5432/6379/7233/8080/8969 on `0.0.0.0` |
 | Put public TLS on the **existing** host reverse proxy | Point Plane or EvoCRM vhosts at this stack |
 | Leave social / Stripe / OpenAI keys empty until the owner supplies them | Guess OAuth client IDs or publish to social networks |
-| First-owner register in the browser | Seed users from this agent |
+| First-owner register only on loopback (or bootstrap proxy auth) | Expose `/auth` on the public name while `BOOTSTRAP_REGISTRATION=true` |
+| Tag the image `postiz-evo:$(git rev-parse HEAD)` | Tag with upstream `5a131eb0` / `gitroomhq` `latest` |
 
 ## Pinned revision
 
-Recorded in `PINNED_REVISION.txt`:
+The image tag **is** `git rev-parse HEAD` of the tree you build. That tree must include `var/docker/nginx.conf` forwarded-proto/WebSocket fixes, `curl` in `Dockerfile.dev`, `COOKIE_HOST_ONLY`, and `BOOTSTRAP_REGISTRATION`. Do **not** label the image with upstream `5a131eb01d91eeeb53c76ba6f76a068e89f8ee18` (the gitroomhq merge that does not contain those fixes).
 
-- Repo: `https://github.com/Mohamedbeghanem/postiz-evo` (fork of `gitroomhq/postiz-app`)
-- Branch: `main`
-- SHA: `5a131eb01d91eeeb53c76ba6f76a068e89f8ee18` (2026-11-06, `version.txt` = `v1.47.0`)
-- Local image name: `postiz-evo:5a131eb01d91eeeb53c76ba6f76a068e89f8ee18`
-- Build file: `Dockerfile.dev` (this is the same file GHCR uses upstream; **we tag it locally**, we do not pull their registry)
+```bash
+export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
+echo "$POSTIZ_GIT_SHA"   # this is the pin
+```
 
-Root `docker-compose.yaml` still says `image: ghcr.io/gitroomhq/postiz-app:latest`. That is a silent upstream replacement. **Do not run it on this VPS.**
+`deploy/PINNED_REVISION.txt` records the SHA this agent actually built. Root `docker-compose.yaml` still says `image: ghcr.io/gitroomhq/postiz-app:latest`. **Do not run it on this VPS.**
 
 ## Why this compose is not the stock file
 
@@ -69,6 +69,9 @@ Must be non-empty for the configuration checker / boot:
 - `POSTIZ_DB_USER` / `POSTIZ_DB_PASSWORD` / `POSTIZ_DB_NAME`
 - `TEMPORAL_DB_PASSWORD`
 - `IS_GENERAL=true`
+- `DISABLE_REGISTRATION=true`
+- `BOOTSTRAP_REGISTRATION=false` until the loopback owner step, then `true` for that step only
+- `COOKIE_HOST_ONLY=true`
 - `STORAGE_PROVIDER=local`
 - `UPLOAD_DIRECTORY=/uploads`
 - `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY=/uploads`
@@ -81,9 +84,9 @@ Compose injects (do not point these at `localhost` for Postgres/Redis/Temporal):
 - `BACKEND_INTERNAL_URL=http://localhost:3000` (same container)
 - `MAIN_URL` / `FRONTEND_URL` / `NEXT_PUBLIC_BACKEND_URL` from `POSTIZ_PUBLIC_URL`
 
-`DISABLE_REGISTRATION=true` still allows the **first** organization to register (`canRegister` returns true while org count is 0). After that, local registration is closed. That is the owner onboarding path.
+`DISABLE_REGISTRATION=true` plus `BOOTSTRAP_REGISTRATION=false` (this bundle's default) means **nobody** can register, including the first SUPERADMIN. That is intentional. Flip `BOOTSTRAP_REGISTRATION=true` only for the loopback owner step below, then set it back to `false` and recreate.
 
-Do **not** set `EMAIL_PROVIDER` for the first login. If it is set, the first user is created unactivated and needs a working mailbox.
+Do **not** set `EMAIL_PROVIDER` for that first login. If it is set, the first user is created unactivated and needs a working mailbox.
 
 Leave every social / Stripe / OpenAI / Cloudflare key unset until the owner provides real values. Channels will not post without those apps; that is expected.
 
@@ -103,7 +106,18 @@ Requirements:
 
 The in-container nginx (`var/docker/nginx.conf`) preserves those forwarded headers, upgrades WebSockets, and disables buffering on `/api/` so SSE is not stuck.
 
-Cookie domain: `getCookieUrlFromDomain('https://postiz.evotechly.com')` becomes `.evotechly.com`. Confirm on the host that Plane does not set a cookie named `auth` on that parent domain. This was not live-checked.
+## Cookie isolation (Plane sibling)
+
+Public Plane source (`makeplane/plane` `apps/api/plane/settings/common.py` on `master`):
+
+- `SESSION_COOKIE_NAME` default **`session-id`**
+- `ADMIN_SESSION_COOKIE_NAME` **`admin-session-id`**
+- `SESSION_COOKIE_DOMAIN` / `CSRF_COOKIE_DOMAIN` from env `COOKIE_DOMAIN`, default **`None`** (host-only)
+- `CSRF_COOKIE_NAME` is not set in that file, so Django's default **`csrftoken`** applies
+
+Postiz sets **`auth`**, **`showorg`**, **`org`**, **`track`**. Those names do not match Plane's defaults, so a name collision is not the issue.
+
+The issue is scope. Without `COOKIE_HOST_ONLY`, `getCookieUrlFromDomain('https://postiz.evotechly.com')` sets `Domain=.evotechly.com`, so the Postiz JWT is sent to `plane.evotechly.com` and every other sibling. This bundle sets `COOKIE_HOST_ONLY=true` so the `Domain` attribute is omitted (host-only to `postiz.evotechly.com`). Plane's default `COOKIE_DOMAIN=None` is already host-only for `plane.evotechly.com`. Do not set Plane `COOKIE_DOMAIN=.evotechly.com` either.
 
 ## Health checks
 
@@ -145,12 +159,14 @@ This fork image is a source build:
 Catalog ~8 GB was **not** live-verified. If that figure is the VPS RAM and Plane is already resident, **do not build on-box**. Build on a machine with ≥8 GiB free RAM, `docker save` the tagged image, load it on 13.140.219.161, then `up -d` without `--build`.
 
 ```bash
-# build host (not EvoCRM, not claimed to be the VPS)
+# build host (this cloud VM, or any machine that is not Contabo / not 162)
+export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
 docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml build
-docker save postiz-evo:5a131eb01d91eeeb53c76ba6f76a068e89f8ee18 | gzip > postiz-evo-5a131eb0.tar.gz
+docker save "postiz-evo:${POSTIZ_GIT_SHA}" | gzip > "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz"
+sha256sum "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz"
 
-# 13.140.219.161 only
-gunzip -c postiz-evo-5a131eb0.tar.gz | docker load
+# 13.140.219.161 only — after the image is copied
+gunzip -c "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz" | docker load
 docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml up -d
 ```
 
@@ -164,12 +180,12 @@ sudo chown "$USER":"$USER" /opt/postiz-evo
 cd /opt/postiz-evo
 
 git clone https://github.com/Mohamedbeghanem/postiz-evo.git .
-git checkout 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
-git rev-parse HEAD
-# must print 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+git checkout cursor/postiz-evo-deploy-bundle-a834   # or the merged SHA that contains deploy/
+export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
 
 cp deploy/env.postiz-evo.example deploy/postiz.env
-# edit deploy/postiz.env: JWT_SECRET, POSTIZ_DB_PASSWORD, TEMPORAL_DB_PASSWORD
+# edit deploy/postiz.env: POSTIZ_GIT_SHA, JWT_SECRET, DB passwords
+# BOOTSTRAP_REGISTRATION=false and COOKIE_HOST_ONLY=true
 # use alphanumeric passwords only (DATABASE_URL is not URL-encoded)
 # leave OAuth / Stripe / OpenAI empty
 
@@ -178,42 +194,42 @@ ss -lptn | grep -E '4007|7233|8080' || true
 
 # never: docker compose -f docker-compose.yaml up
 # never: docker pull ghcr.io/gitroomhq/postiz-app
+# never: attach the public vhost yet
 
 docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml config
-docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml build
-docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}} {{.RepoTags}}' \
-  postiz-evo:5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
-# must show 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18 and must not mention gitroomhq
-
 docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml up -d
+# if the image was loaded from docker save, omit --build
 
 docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml ps
 curl -fsS http://127.0.0.1:4007/api/
+curl -fsS http://127.0.0.1:4007/api/auth/can-register
+# expected: {"register":false} while BOOTSTRAP_REGISTRATION=false
 ```
 
-Then attach **one** of:
+Do **not** attach the public vhost yet.
 
-- `deploy/Caddyfile.postiz.evotechly.com.example`
-- `deploy/nginx.postiz.evotechly.com.example`
+## Safe first-owner setup
 
-to the **existing** host proxy. DNS and TLS stay with the host-inventory owner.
+Do not create the owner account from this agent. Do not put the register form on the public internet while the database is empty.
 
-## Initial owner onboarding
+1. Stack listens only on `127.0.0.1:4007`. Leave `postiz.evotechly.com` **unproxied**.
+2. Confirm `BOOTSTRAP_REGISTRATION=false` then `curl http://127.0.0.1:4007/api/auth/can-register` → `{"register":false}`.
+3. SSH (or similar) to 13.140.219.161, set `BOOTSTRAP_REGISTRATION=true` in `deploy/postiz.env`, `docker compose ... up -d` (recreate postiz-evo only).
+4. As the owner, open **http://127.0.0.1:4007** via an SSH tunnel (`ssh -L 4007:127.0.0.1:4007 user@13.140.219.161`) and register email/password/company. First org is `SUPERADMIN`. `EMAIL_PROVIDER` must stay unset so the user is activated immediately.
+5. Set `BOOTSTRAP_REGISTRATION=false`, recreate `postiz-evo`, curl `can-register` again → `{"register":false}`.
+6. Only then attach `Caddyfile.postiz.evotechly.com.example` or the nginx snippet. DNS/TLS stay with the host owner.
 
-1. Open `https://postiz.evotechly.com` (or `http://127.0.0.1:4007` before DNS).
-2. Register the owner email/password/company. First org becomes `SUPERADMIN`. User is activated immediately because `EMAIL_PROVIDER` is unset.
-3. Confirm `/auth/register` is then blocked (`DISABLE_REGISTRATION=true` and org count > 0).
-4. Connect channels only after the owner creates real provider apps. Callback base is `https://postiz.evotechly.com`.
-5. Do not schedule or publish social posts from this deploy.
+If the public name must be used during step 4, put `Caddyfile.bootstrap.example` in front (HTTP basic auth). That is not an application account. Remove it after step 5.
+
+Do not schedule or publish social posts from this deploy.
 
 ## Blockers (not solved here)
 
 1. **Host access / inventory** — catalog ~8 GB not live-verified; RAM vs disk unknown; Plane port map unknown.
-2. **On-box source build vs 8 GB shared with Plane** — high OOM risk; prefer off-box `docker save`/`load`.
-3. **DNS / TLS for postiz.evotechly.com** — out of scope; proxy snippets are files only.
-4. **Cookie parent domain `.evotechly.com`** — possible clash with Plane `auth` cookie; verify on host.
-5. **No social apps** — scheduling UI works; publishing will fail until real OAuth is supplied by the owner.
-6. **Stock compose trap** — `docker compose up` from repo root still pulls upstream unless the operator uses this folder.
+2. **On-box source build vs 8 GB shared with Plane** — high OOM risk; load the image built off-server.
+3. **DNS / TLS for postiz.evotechly.com** — out of scope; proxy snippets are files only. Do not attach them until bootstrap is closed.
+4. **No social apps** — scheduling UI works; publishing will fail until real OAuth is supplied by the owner.
+5. **Stock compose trap** — `docker compose up` from repo root still pulls upstream unless the operator uses this folder.
 
 ## Evidence paths
 
@@ -224,6 +240,7 @@ In this repository (after merge of the deploy PR):
 - `deploy/docker-compose.postiz-evo.yaml`
 - `deploy/env.postiz-evo.example`
 - `deploy/Caddyfile.postiz.evotechly.com.example`
+- `deploy/Caddyfile.bootstrap.example`
 - `deploy/nginx.postiz.evotechly.com.example`
 - `deploy/temporal-dynamicconfig.yaml`
 - `Dockerfile.dev`, `var/docker/nginx.conf`

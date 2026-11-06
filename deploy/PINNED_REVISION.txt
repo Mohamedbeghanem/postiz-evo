@@ -1,28 +1,28 @@
 # Pinned revision for postiz.evotechly.com — this exact fork, not upstream.
 #
-# Repo:   https://github.com/Mohamedbeghanem/postiz-evo
-# Parent: gitroomhq/postiz-app (GitHub reports isFork=true)
-# Branch: main
-# SHA:    5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
-# Date:   2026-11-06 02:55:36 +0000
-# Tag in version.txt: v1.47.0
-# Subject: Merge pull request #2380 from gitroomhq/fix/refresh-token-rotation-race
+# The image tag MUST be git rev-parse HEAD of the tree that contains:
+#   - var/docker/nginx.conf forwarded-proto + WebSocket + SSE
+#   - Dockerfile.dev curl healthcheck
+#   - COOKIE_HOST_ONLY host-only cookies
+#   - BOOTSTRAP_REGISTRATION first-owner lock
 #
+# FORBIDDEN: tagging with upstream 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
 # FORBIDDEN image: ghcr.io/gitroomhq/postiz-app:latest
 # FORBIDDEN host:  13.140.219.162 (EvoCRM)
-# Target host:     13.140.219.161 (shared with plane.evotechly.com)
-# Public URL:      https://postiz.evotechly.com
 #
-# Image must be built from this tree's Dockerfile.dev at the SHA above.
-# Stock docker-compose.yaml pulls the upstream GHCR image and must not be used.
+# Operator:
+#   git checkout <this branch tip>
+#   export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
+#   docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml build
 
 REPO=https://github.com/Mohamedbeghanem/postiz-evo
-BRANCH=main
-SHA=5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
-IMAGE_LOCAL=postiz-evo:5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+BRANCH=cursor/postiz-evo-deploy-bundle-a834
+UPSTREAM_MERGE_SHA_DO_NOT_BUILD_AS_IMAGE=5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
 DOCKERFILE=Dockerfile.dev
 COMPOSE=deploy/docker-compose.postiz-evo.yaml
 LOOPBACK=127.0.0.1:4007
 PUBLIC_URL=https://postiz.evotechly.com
 TARGET_VPS=13.140.219.161
 FORBIDDEN_VPS=13.140.219.162
+COOKIE_HOST_ONLY=true
+BOOTSTRAP_REGISTRATION_DEFAULT=false
