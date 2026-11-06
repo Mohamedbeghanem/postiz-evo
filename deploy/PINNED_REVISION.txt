@@ -1,28 +1,29 @@
 # Pinned revision for postiz.evotechly.com — this exact fork, not upstream.
 #
-# The image tag MUST be git rev-parse HEAD of the tree that contains:
-#   - var/docker/nginx.conf forwarded-proto + WebSocket + SSE
-#   - Dockerfile.dev curl healthcheck
-#   - COOKIE_HOST_ONLY host-only cookies
-#   - BOOTSTRAP_REGISTRATION first-owner lock
-#
-# FORBIDDEN: tagging with upstream 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
-# FORBIDDEN image: ghcr.io/gitroomhq/postiz-app:latest
-# FORBIDDEN host:  13.140.219.162 (EvoCRM)
-#
-# Operator:
-#   git checkout <this branch tip>
-#   export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
-#   docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml build
+# Image actually built off-server (this cloud VM), not on Contabo.
+# Do not retag as ghcr.io/gitroomhq/postiz-app or as upstream merge SHA
+# 5a131eb01d91eeeb53c76ba6f76a068e89f8ee18 (that tree lacks nginx/curl/
+# COOKIE_HOST_ONLY/BOOTSTRAP_REGISTRATION/LABEL fixes).
 
 REPO=https://github.com/Mohamedbeghanem/postiz-evo
 BRANCH=cursor/postiz-evo-deploy-bundle-a834
-UPSTREAM_MERGE_SHA_DO_NOT_BUILD_AS_IMAGE=5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+IMAGE_GIT_SHA=1e1418a6db524f93c23585a3e5fa971cd85858d7
+IMAGE_LOCAL=postiz-evo:1e1418a6db524f93c23585a3e5fa971cd85858d7
+IMAGE_ID=sha256:5e5d7a792be81702299366762165879dc79574c49a81eed97b9d918baeb4f9bc
+LABEL_SOURCE=https://github.com/Mohamedbeghanem/postiz-evo
+LABEL_REVISION=1e1418a6db524f93c23585a3e5fa971cd85858d7
 DOCKERFILE=Dockerfile.dev
 COMPOSE=deploy/docker-compose.postiz-evo.yaml
-LOOPBACK=127.0.0.1:4007
+LOOPBACK_PROD=127.0.0.1:4007
 PUBLIC_URL=https://postiz.evotechly.com
 TARGET_VPS=13.140.219.161
 FORBIDDEN_VPS=13.140.219.162
 COOKIE_HOST_ONLY=true
 BOOTSTRAP_REGISTRATION_DEFAULT=false
+UPSTREAM_MERGE_SHA_DO_NOT_BUILD_AS_IMAGE=5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+
+# Operator:
+#   git checkout 1e1418a6db524f93c23585a3e5fa971cd85858d7
+#   export POSTIZ_GIT_SHA=1e1418a6db524f93c23585a3e5fa971cd85858d7
+#   docker load < postiz-evo-1e1418a6db524f93c23585a3e5fa971cd85858d7.tar.gz
+# or rebuild from this SHA with Dockerfile.dev
