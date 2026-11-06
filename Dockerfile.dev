@@ -26,4 +26,8 @@ COPY var/docker/nginx.conf /etc/nginx/nginx.conf
 RUN pnpm install
 RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm run build
 
+ARG POSTIZ_GIT_SHA=unknown
+LABEL org.opencontainers.image.source="https://github.com/Mohamedbeghanem/postiz-evo"
+LABEL org.opencontainers.image.revision="${POSTIZ_GIT_SHA}"
+
 CMD ["sh", "-c", "nginx && pnpm run pm2"]

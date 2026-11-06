@@ -22,6 +22,7 @@ services:
       dockerfile: Dockerfile.dev
       args:
         NEXT_PUBLIC_VERSION: postiz-evo-${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
+        POSTIZ_GIT_SHA: ${POSTIZ_GIT_SHA:?set POSTIZ_GIT_SHA to git rev-parse HEAD}
     container_name: postiz-evo
     restart: unless-stopped
     env_file:
