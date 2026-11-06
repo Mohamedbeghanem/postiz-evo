@@ -158,12 +158,20 @@ This fork image is a source build:
 
 Catalog ~8 GB was **not** live-verified. If that figure is the VPS RAM and Plane is already resident, **do not build on-box**. Build on a machine with ≥8 GiB free RAM, `docker save` the tagged image, load it on 13.140.219.161, then `up -d` without `--build`.
 
+This agent already built and exported:
+
+- tag `postiz-evo:1e1418a6db524f93c23585a3e5fa971cd85858d7`
+- Id `sha256:db7ca702e2df4b35abdf61f76d68fd838e26f0539059259b5893c48290d64515`
+- gzip sha256 `62ed5caa98bf7307ae5d61518a9f9165410b73126c7103e39ab9bb5f79bfabab` (1629090123 bytes)
+
+The Cursor artifact store cannot hold a single 1.6G file (close fails above ~100MiB). Coordinator copies are 90MiB parts plus `IMAGE_SHA256SUMS.txt`. Reconstruct before `docker load`:
+
 ```bash
 # build host (this cloud VM, or any machine that is not Contabo / not 162)
-export POSTIZ_GIT_SHA=$(git rev-parse HEAD)
-docker compose --env-file deploy/postiz.env -f deploy/docker-compose.postiz-evo.yaml build
-docker save "postiz-evo:${POSTIZ_GIT_SHA}" | gzip > "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz"
-sha256sum "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz"
+export POSTIZ_GIT_SHA=1e1418a6db524f93c23585a3e5fa971cd85858d7
+# if transferring artifact parts:
+cat "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz.part"* > "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz"
+echo "62ed5caa98bf7307ae5d61518a9f9165410b73126c7103e39ab9bb5f79bfabab  postiz-evo-${POSTIZ_GIT_SHA}.tar.gz" | sha256sum -c
 
 # 13.140.219.161 only — after the image is copied
 gunzip -c "postiz-evo-${POSTIZ_GIT_SHA}.tar.gz" | docker load
@@ -250,3 +258,6 @@ Coordinator copies written by the readiness agent:
 - `/opt/cursor/artifacts/postiz-evo-readiness/PINNED_REVISION.txt`
 - `/opt/cursor/artifacts/postiz-evo-readiness/FINDINGS.md`
 - `/opt/cursor/artifacts/postiz-evo-readiness/DEPLOY.md`
+- `/opt/cursor/artifacts/postiz-evo-readiness/IMAGE_SHA256SUMS.txt`
+- `/opt/cursor/artifacts/postiz-evo-readiness/postiz-evo-1e1418a6db524f93c23585a3e5fa971cd85858d7.tar.gz.part000` … `.part017`
+- `/var/tmp/postiz-evo-bundle/postiz-evo-1e1418a6db524f93c23585a3e5fa971cd85858d7.tar.gz` (full gzip on the build VM)

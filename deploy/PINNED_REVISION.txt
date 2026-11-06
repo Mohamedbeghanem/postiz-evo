@@ -9,7 +9,9 @@ REPO=https://github.com/Mohamedbeghanem/postiz-evo
 BRANCH=cursor/postiz-evo-deploy-bundle-a834
 IMAGE_GIT_SHA=1e1418a6db524f93c23585a3e5fa971cd85858d7
 IMAGE_LOCAL=postiz-evo:1e1418a6db524f93c23585a3e5fa971cd85858d7
-IMAGE_ID=sha256:5e5d7a792be81702299366762165879dc79574c49a81eed97b9d918baeb4f9bc
+IMAGE_ID=sha256:db7ca702e2df4b35abdf61f76d68fd838e26f0539059259b5893c48290d64515
+IMAGE_TAR_GZ_BYTES=1629090123
+IMAGE_TAR_GZ_SHA256=62ed5caa98bf7307ae5d61518a9f9165410b73126c7103e39ab9bb5f79bfabab
 LABEL_SOURCE=https://github.com/Mohamedbeghanem/postiz-evo
 LABEL_REVISION=1e1418a6db524f93c23585a3e5fa971cd85858d7
 DOCKERFILE=Dockerfile.dev
@@ -25,5 +27,6 @@ UPSTREAM_MERGE_SHA_DO_NOT_BUILD_AS_IMAGE=5a131eb01d91eeeb53c76ba6f76a068e89f8ee1
 # Operator:
 #   git checkout 1e1418a6db524f93c23585a3e5fa971cd85858d7
 #   export POSTIZ_GIT_SHA=1e1418a6db524f93c23585a3e5fa971cd85858d7
-#   docker load < postiz-evo-1e1418a6db524f93c23585a3e5fa971cd85858d7.tar.gz
+#   cat postiz-evo-${POSTIZ_GIT_SHA}.tar.gz.part* > postiz-evo-${POSTIZ_GIT_SHA}.tar.gz
+#   gunzip -c postiz-evo-${POSTIZ_GIT_SHA}.tar.gz | docker load
 # or rebuild from this SHA with Dockerfile.dev
