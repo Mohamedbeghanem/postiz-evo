@@ -16,6 +16,7 @@ dist
 **/.git
 **/*.md
 **/LICENSE
+/deploy
 **/npm-debug.log
 **/*.vscode
 .git

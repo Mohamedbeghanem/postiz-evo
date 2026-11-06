@@ -1,0 +1,28 @@
+# Pinned revision for postiz.evotechly.com — this exact fork, not upstream.
+#
+# Repo:   https://github.com/Mohamedbeghanem/postiz-evo
+# Parent: gitroomhq/postiz-app (GitHub reports isFork=true)
+# Branch: main
+# SHA:    5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+# Date:   2026-11-06 02:55:36 +0000
+# Tag in version.txt: v1.47.0
+# Subject: Merge pull request #2380 from gitroomhq/fix/refresh-token-rotation-race
+#
+# FORBIDDEN image: ghcr.io/gitroomhq/postiz-app:latest
+# FORBIDDEN host:  13.140.219.162 (EvoCRM)
+# Target host:     13.140.219.161 (shared with plane.evotechly.com)
+# Public URL:      https://postiz.evotechly.com
+#
+# Image must be built from this tree's Dockerfile.dev at the SHA above.
+# Stock docker-compose.yaml pulls the upstream GHCR image and must not be used.
+
+REPO=https://github.com/Mohamedbeghanem/postiz-evo
+BRANCH=main
+SHA=5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+IMAGE_LOCAL=postiz-evo:5a131eb01d91eeeb53c76ba6f76a068e89f8ee18
+DOCKERFILE=Dockerfile.dev
+COMPOSE=deploy/docker-compose.postiz-evo.yaml
+LOOPBACK=127.0.0.1:4007
+PUBLIC_URL=https://postiz.evotechly.com
+TARGET_VPS=13.140.219.161
+FORBIDDEN_VPS=13.140.219.162
